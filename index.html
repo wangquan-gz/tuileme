@@ -286,6 +286,56 @@
         el.addEventListener('mouseleave', end);
     }
 
+    // ========== 渲染项目卡片 ==========
+    function createProjectCard(item) {
+        const project = item.project;
+        const progressCount = item.count;
+        const latestProgress = item.latest;
+        
+        const isCompleted = project.status === 'completed';
+        const isSelected = selectedProjects.has(project.id);
+        const bgColor = isCompleted ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
+        const textColor = isCompleted ? 'text-green-700' : 'text-amber-700';
+
+        const card = document.createElement('div');
+        card.className = 'long-press ' + bgColor + ' border rounded-xl p-4 cursor-pointer relative';
+        
+        let checkboxHtml = '';
+        let paddingClass = '';
+        if (selectMode) {
+            const checked = isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300';
+            const checkIcon = isSelected ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : '';
+            checkboxHtml = '<div class="absolute top-3 left-3 w-5 h-5 rounded border-2 ' + checked + ' flex items-center justify-center">' + checkIcon + '</div>';
+            paddingClass = 'pl-8';
+        }
+        
+        let latestHtml = '';
+        if (latestProgress) {
+            latestHtml = '<span class="text-gray-400 text-xs">' + formatDateTime(latestProgress.createdAt) + '</span> ' + latestProgress.content;
+        } else {
+            latestHtml = '<span class="text-gray-400">暂无进度记录</span>';
+        }
+
+        card.innerHTML = checkboxHtml + 
+            '<div class="' + paddingClass + '">' +
+                '<div class="flex items-start justify-between mb-2">' +
+                    '<h3 class="font-bold ' + textColor + '">' + project.name + '</h3>' +
+                    '<span class="text-xs ' + textColor + ' opacity-70">' + progressCount + '条</span>' +
+                '</div>' +
+                '<p class="text-xs text-gray-500 mb-2">创建于 ' + formatDate(project.createdAt) + '</p>' +
+                '<p class="text-sm text-gray-600 truncate">' + latestHtml + '</p>' +
+            '</div>';
+
+        if (selectMode) {
+            card.onclick = function() { toggleSelectProject(project.id); };
+        } else {
+            card.onclick = function() { openProjectDetail(project.id); };
+        }
+        
+        bindLongPress(card, 'project', project.id);
+        return card;
+    }
+
     // ========== 项目列表 ==========
     function loadProjects() {
         return db.projects.orderBy('createdAt').reverse().toArray().then(function(projects) {
@@ -302,9 +352,13 @@
                 return;
             }
 
-            listEl.innerHTML = '';
-            
-            const promises = projects.map(function(project) {
+            // 分成两组
+            const inProgress = projects.filter(function(p) { return p.status === 'in_progress'; });
+            const completed = projects.filter(function(p) { return p.status === 'completed'; });
+
+            // 加载所有项目的进度信息
+            const allProjects = inProgress.concat(completed);
+            const promises = allProjects.map(function(project) {
                 return Promise.all([
                     db.progressRecords.where('projectId').equals(project.id).count(),
                     db.progressRecords.where('projectId').equals(project.id).reverse().sortBy('createdAt').then(function(arr) { return arr[0]; })
@@ -317,55 +371,41 @@
                 });
             });
 
-            return Promise.all(promises).then(function(items) {
-                items.forEach(function(item) {
-                    const project = item.project;
-                    const progressCount = item.count;
-                    const latestProgress = item.latest;
-                    
-                    const isCompleted = project.status === 'completed';
-                    const isSelected = selectedProjects.has(project.id);
-                    const bgColor = isCompleted ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
-                    const textColor = isCompleted ? 'text-green-700' : 'text-amber-700';
+            return Promise.all(promises).then(function(allItems) {
+                const inProgressItems = allItems.filter(function(item) { return item.project.status === 'in_progress'; });
+                const completedItems = allItems.filter(function(item) { return item.project.status === 'completed'; });
 
-                    const card = document.createElement('div');
-                    card.className = 'long-press ' + bgColor + ' border rounded-xl p-4 cursor-pointer relative';
-                    
-                    let checkboxHtml = '';
-                    let paddingClass = '';
-                    if (selectMode) {
-                        const checked = isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300';
-                        const checkIcon = isSelected ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : '';
-                        checkboxHtml = '<div class="absolute top-3 left-3 w-5 h-5 rounded border-2 ' + checked + ' flex items-center justify-center">' + checkIcon + '</div>';
-                        paddingClass = 'pl-8';
-                    }
-                    
-                    let latestHtml = '';
-                    if (latestProgress) {
-                        latestHtml = '<span class="text-gray-400 text-xs">' + formatDateTime(latestProgress.createdAt) + '</span> ' + latestProgress.content;
-                    } else {
-                        latestHtml = '<span class="text-gray-400">暂无进度记录</span>';
-                    }
+                listEl.innerHTML = '';
 
-                    card.innerHTML = checkboxHtml + 
-                        '<div class="' + paddingClass + '">' +
-                            '<div class="flex items-start justify-between mb-2">' +
-                                '<h3 class="font-bold ' + textColor + '">' + project.name + '</h3>' +
-                                '<span class="text-xs ' + textColor + ' opacity-70">' + progressCount + '条</span>' +
-                            '</div>' +
-                            '<p class="text-xs text-gray-500 mb-2">创建于 ' + formatDate(project.createdAt) + '</p>' +
-                            '<p class="text-sm text-gray-600 truncate">' + latestHtml + '</p>' +
-                        '</div>';
+                // 进行中组
+                if (inProgressItems.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center gap-2 mb-2 mt-1';
+                    header.innerHTML = '<span class="w-1 h-4 bg-amber-400 rounded"></span><span class="text-sm font-medium text-gray-700">进行中</span><span class="text-xs text-gray-400">' + inProgressItems.length + '个</span>';
+                    listEl.appendChild(header);
 
-                    if (selectMode) {
-                        card.onclick = function() { toggleSelectProject(project.id); };
-                    } else {
-                        card.onclick = function() { openProjectDetail(project.id); };
-                    }
-                    
-                    bindLongPress(card, 'project', project.id);
-                    listEl.appendChild(card);
-                });
+                    const group = document.createElement('div');
+                    group.className = 'space-y-3 mb-5';
+                    inProgressItems.forEach(function(item) {
+                        group.appendChild(createProjectCard(item));
+                    });
+                    listEl.appendChild(group);
+                }
+
+                // 已完结组
+                if (completedItems.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center gap-2 mb-2 mt-1';
+                    header.innerHTML = '<span class="w-1 h-4 bg-green-400 rounded"></span><span class="text-sm font-medium text-gray-700">已完结</span><span class="text-xs text-gray-400">' + completedItems.length + '个</span>';
+                    listEl.appendChild(header);
+
+                    const group = document.createElement('div');
+                    group.className = 'space-y-3';
+                    completedItems.forEach(function(item) {
+                        group.appendChild(createProjectCard(item));
+                    });
+                    listEl.appendChild(group);
+                }
             });
         });
     }
@@ -689,8 +729,41 @@
         if (e.key === 'Enter') addProgress();
     });
 
+    // ========== 加载示例数据 ==========
+    function loadDemoData() {
+        const now = Date.now();
+        const demos = [
+            { name: 'Q3新产品开发', status: 'in_progress', offsetDays: 3, progresses: ['需求评审完成', 'UI设计稿交付', '前端开发40%', '后端接口联调中'] },
+            { name: '客户管理系统升级', status: 'completed', offsetDays: 7, progresses: ['项目立项', '开发完成', '测试通过', '上线部署成功'] },
+            { name: '新员工入职培训', status: 'in_progress', offsetDays: 2, progresses: ['培训大纲制定', '第一期培训完成'] },
+            { name: '年度财务审计', status: 'in_progress', offsetDays: 1, progresses: ['资料收集中'] }
+        ];
+
+        return Promise.all(demos.map(function(demo, idx) {
+            return db.projects.add({
+                name: demo.name,
+                status: demo.status,
+                createdAt: now - demo.offsetDays * 86400000
+            }).then(function(pid) {
+                return Promise.all(demo.progresses.map(function(content, pidx) {
+                    return db.progressRecords.add({
+                        projectId: pid,
+                        content: content,
+                        createdAt: now - demo.offsetDays * 86400000 + pidx * 3600000
+                    });
+                }));
+            });
+        }));
+    }
+
     // ========== 初始化 ==========
     db.open().then(function() {
+        return db.projects.count().then(function(count) {
+            if (count === 0) {
+                return loadDemoData();
+            }
+        });
+    }).then(function() {
         return loadProjects();
     }).catch(function(err) {
         document.getElementById('project-list').innerHTML = 

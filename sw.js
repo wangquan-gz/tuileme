@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nituileme-v1';
-const ASSETS = [
+const CACHE_NAME = 'nituileme-v2';
+const STATIC_ASSETS = [
     './',
     './index.html',
     './manifest.json',
@@ -9,7 +9,7 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS);
+            return cache.addAll(STATIC_ASSETS);
         })
     );
     self.skipWaiting();
@@ -27,23 +27,27 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+    const request = event.request;
+    
+    // 只缓存GET请求
+    if (request.method !== 'GET') return;
+
     event.respondWith(
-        caches.match(event.request).then((response) => {
-            if (response) {
-                return response;
-            }
-            return fetch(event.request).then((response) => {
-                if (!response || response.status !== 200 || response.type !== 'basic') {
-                    return response;
+        caches.match(request).then((cachedResponse) => {
+            // 有缓存直接返回，同时后台更新
+            const fetchPromise = fetch(request).then((networkResponse) => {
+                if (networkResponse && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(request, responseClone);
+                    });
                 }
-                const responseToCache = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                });
-                return response;
+                return networkResponse;
             }).catch(() => {
-                return caches.match('./index.html');
+                return cachedResponse;
             });
+
+            return cachedResponse || fetchPromise;
         })
     );
 });
