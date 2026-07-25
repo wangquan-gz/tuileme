@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="你推了么">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="app-icon.png">
+    <title>你推了么</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overscroll-behavior: none;
+            margin: 0;
+            padding: 0;
+        }
+        .long-press { transition: transform 0.1s; }
+        .long-press:active { transform: scale(0.97); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .h-screen-100 { height: 100vh; height: 100dvh; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen-100 overflow-hidden">
+    <div id="app" class="h-full flex flex-col max-w-md mx-auto bg-white">
+        <!-- 主页 -->
+        <div id="home-page" class="h-full flex flex-col">
+            <!-- 顶部标题区 -->
+            <div class="bg-gradient-to-r from-amber-400 to-orange-400 text-white px-4 py-4 flex-shrink-0">
+                <div class="flex items-center justify-between mb-3">
+                    <h1 class="text-xl font-bold">我的项目</h1>
+                    <button id="export-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">导出</button>
+                </div>
+                <div id="normal-mode" class="flex gap-2">
+                    <input type="text" id="project-input" placeholder="输入项目名称..." 
+                        class="flex-1 px-4 py-2 rounded-lg text-gray-800 placeholder-gray-400 outline-none text-sm">
+                    <button id="add-project-btn" class="bg-white text-orange-500 px-4 py-2 rounded-lg font-medium text-sm">
+                        新建
+                    </button>
+                </div>
+                <div id="select-mode" class="hidden flex gap-2 items-center">
+                    <button id="select-all-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">全选</button>
+                    <button id="cancel-select-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">取消</button>
+                    <span id="selected-count" class="text-sm ml-auto">已选 0 项</span>
+                </div>
+            </div>
+
+            <!-- 项目列表 -->
+            <div id="project-list" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
+                <div class="text-center text-gray-400 py-20">
+                    <p class="text-5xl mb-4">🏔️</p>
+                    <p>加载中...</p>
+                </div>
+            </div>
+
+            <div id="export-bottom-bar" class="hidden flex-shrink-0 p-4 bg-white border-t">
+                <button id="confirm-export-btn" class="w-full bg-orange-500 text-white py-3 rounded-xl font-medium">
+                    确认导出
+                </button>
+            </div>
+        </div>
+
+        <!-- 项目详情页 -->
+        <div id="detail-page" class="h-full flex flex-col hidden">
+            <div id="detail-header" class="bg-gradient-to-r from-amber-400 to-orange-400 text-white px-4 py-4 flex-shrink-0">
+                <h2 id="detail-project-name" class="text-lg font-bold mb-1">项目名称</h2>
+                <p id="detail-project-date" class="text-sm opacity-80">创建时间</p>
+            </div>
+
+            <div id="progress-list" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
+            </div>
+
+            <div id="add-progress-section" class="flex-shrink-0 p-4 bg-white border-t">
+                <div class="flex gap-2">
+                    <input type="text" id="progress-input" placeholder="输入进度内容..." 
+                        class="flex-1 px-4 py-2 rounded-lg border border-gray-200 outline-none focus:border-orange-400 text-sm">
+                    <button id="add-progress-btn" class="bg-orange-500 text-white px-4 py-2 rounded-lg font-medium text-sm">
+                        记录
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-shrink-0 p-4 bg-gray-50 border-t flex gap-3">
+                <button id="back-btn" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-medium">
+                    返回
+                </button>
+                <button id="complete-btn" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium">
+                    完结
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-6 mx-6 max-w-sm w-full">
+            <h3 id="confirm-title" class="text-lg font-bold mb-2">确认</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6">确定要执行此操作吗？</p>
+            <div class="flex gap-3">
+                <button id="confirm-cancel" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-700">取消</button>
+                <button id="confirm-ok" class="flex-1 py-2 rounded-lg bg-red-500 text-white">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-6 mx-6 max-w-sm w-full">
+            <h3 id="edit-title" class="text-lg font-bold mb-4">编辑</h3>
+            <input type="text" id="edit-input" class="w-full px-4 py-3 rounded-lg border border-gray-200 outline-none focus:border-orange-400 mb-6">
+            <div class="flex gap-3">
+                <button id="edit-cancel" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-700">取消</button>
+                <button id="edit-ok" class="flex-1 py-2 rounded-lg bg-orange-500 text-white">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 长按菜单 -->
+    <div id="longpress-menu" class="fixed bg-white rounded-xl shadow-2xl z-50 hidden overflow-hidden py-1 min-w-[120px]">
+        <button id="menu-edit" class="w-full px-4 py-3 text-left text-sm hover:bg-gray-50">修改</button>
+        <button id="menu-delete" class="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-gray-50">删除</button>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg text-sm z-50 opacity-0 transition-opacity pointer-events-none">
+        提示
+    </div>
+
+    <!-- Dexie.js -->
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+    <!-- XLSX -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+    // ========== 数据库 ==========
+    const db = new Dexie('NiTuiLeMeDB');
+    db.version(1).stores({
+        projects: '++id, name, status, createdAt',
+        progressRecords: '++id, projectId, content, createdAt'
+    });
+
+    // ========== 状态 ==========
+    let currentProjectId = null;
+    let selectMode = false;
+    let selectedProjects = new Set();
+    let longPressTarget = null;
+
+    // ========== 工具函数 ==========
+    function formatDate(ts) {
+        const d = new Date(ts);
+        return d.getFullYear() + '-' + 
+            String(d.getMonth()+1).padStart(2,'0') + '-' + 
+            String(d.getDate()).padStart(2,'0');
+    }
+
+    function formatDateTime(ts) {
+        const d = new Date(ts);
+        return String(d.getMonth()+1).padStart(2,'0') + '-' + 
+            String(d.getDate()).padStart(2,'0') + ' ' +
+            String(d.getHours()).padStart(2,'0') + ':' + 
+            String(d.getMinutes()).padStart(2,'0');
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.style.opacity = '1';
+        setTimeout(function() { toast.style.opacity = '0'; }, 2000);
+    }
+
+    // ========== 确认弹窗 ==========
+    let confirmCallback = null;
+    function showConfirm(title, message, callback) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        confirmCallback = callback;
+        document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+    document.getElementById('confirm-cancel').onclick = function() {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        confirmCallback = null;
+    };
+    document.getElementById('confirm-ok').onclick = function() {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        if (confirmCallback) confirmCallback();
+        confirmCallback = null;
+    };
+
+    // ========== 编辑弹窗 ==========
+    let editCallback = null;
+    function showEdit(title, defaultValue, callback) {
+        document.getElementById('edit-title').textContent = title;
+        document.getElementById('edit-input').value = defaultValue;
+        editCallback = callback;
+        document.getElementById('edit-modal').classList.remove('hidden');
+        setTimeout(function() { document.getElementById('edit-input').focus(); }, 100);
+    }
+    document.getElementById('edit-cancel').onclick = function() {
+        document.getElementById('edit-modal').classList.add('hidden');
+        editCallback = null;
+    };
+    document.getElementById('edit-ok').onclick = function() {
+        const val = document.getElementById('edit-input').value.trim();
+        if (val && editCallback) editCallback(val);
+        document.getElementById('edit-modal').classList.add('hidden');
+        editCallback = null;
+    };
+
+    // ========== 长按菜单 ==========
+    function showLongPressMenu(e, type, id) {
+        e.preventDefault();
+        e.stopPropagation();
+        const menu = document.getElementById('longpress-menu');
+        longPressTarget = { type: type, id: id };
+        
+        const touch = e.touches ? e.touches[0] : e;
+        let x = touch.clientX || 100;
+        let y = touch.clientY || 100;
+        x = Math.min(x, window.innerWidth - 130);
+        y = Math.min(y, window.innerHeight - 100);
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.classList.remove('hidden');
+    }
+
+    function hideLongPressMenu() {
+        document.getElementById('longpress-menu').classList.add('hidden');
+        longPressTarget = null;
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#longpress-menu')) {
+            hideLongPressMenu();
+        }
+    });
+
+    document.getElementById('menu-edit').onclick = function() {
+        if (!longPressTarget) return;
+        if (longPressTarget.type === 'project') {
+            editProject(longPressTarget.id);
+        } else {
+            editProgress(longPressTarget.id);
+        }
+        hideLongPressMenu();
+    };
+
+    document.getElementById('menu-delete').onclick = function() {
+        if (!longPressTarget) return;
+        if (longPressTarget.type === 'project') {
+            deleteProject(longPressTarget.id);
+        } else {
+            deleteProgress(longPressTarget.id);
+        }
+        hideLongPressMenu();
+    };
+
+    // ========== 长按绑定 ==========
+    function bindLongPress(el, type, id) {
+        let timer = null;
+        
+        function start(e) {
+            if (selectMode && type === 'project') return;
+            timer = setTimeout(function() {
+                showLongPressMenu(e, type, id);
+                if (navigator.vibrate) navigator.vibrate(50);
+            }, 500);
+        }
+        
+        function end() {
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+        }
+        
+        el.addEventListener('touchstart', start);
+        el.addEventListener('touchend', end);
+        el.addEventListener('touchmove', end);
+        el.addEventListener('mousedown', start);
+        el.addEventListener('mouseup', end);
+        el.addEventListener('mouseleave', end);
+    }
+
+    // ========== 项目列表 ==========
+    function loadProjects() {
+        return db.projects.orderBy('createdAt').reverse().toArray().then(function(projects) {
+            const listEl = document.getElementById('project-list');
+            
+            if (projects.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center text-gray-400 py-20">
+                        <p class="text-5xl mb-4">🏔️</p>
+                        <p>还没有项目</p>
+                        <p class="text-sm mt-2">在上方输入名称开始吧</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            
+            const promises = projects.map(function(project) {
+                return Promise.all([
+                    db.progressRecords.where('projectId').equals(project.id).count(),
+                    db.progressRecords.where('projectId').equals(project.id).reverse().sortBy('createdAt').then(function(arr) { return arr[0]; })
+                ]).then(function(results) {
+                    return {
+                        project: project,
+                        count: results[0],
+                        latest: results[1]
+                    };
+                });
+            });
+
+            return Promise.all(promises).then(function(items) {
+                items.forEach(function(item) {
+                    const project = item.project;
+                    const progressCount = item.count;
+                    const latestProgress = item.latest;
+                    
+                    const isCompleted = project.status === 'completed';
+                    const isSelected = selectedProjects.has(project.id);
+                    const bgColor = isCompleted ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200';
+                    const textColor = isCompleted ? 'text-green-700' : 'text-amber-700';
+
+                    const card = document.createElement('div');
+                    card.className = 'long-press ' + bgColor + ' border rounded-xl p-4 cursor-pointer relative';
+                    
+                    let checkboxHtml = '';
+                    let paddingClass = '';
+                    if (selectMode) {
+                        const checked = isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300';
+                        const checkIcon = isSelected ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>' : '';
+                        checkboxHtml = '<div class="absolute top-3 left-3 w-5 h-5 rounded border-2 ' + checked + ' flex items-center justify-center">' + checkIcon + '</div>';
+                        paddingClass = 'pl-8';
+                    }
+                    
+                    let latestHtml = '';
+                    if (latestProgress) {
+                        latestHtml = '<span class="text-gray-400 text-xs">' + formatDateTime(latestProgress.createdAt) + '</span> ' + latestProgress.content;
+                    } else {
+                        latestHtml = '<span class="text-gray-400">暂无进度记录</span>';
+                    }
+
+                    card.innerHTML = checkboxHtml + 
+                        '<div class="' + paddingClass + '">' +
+                            '<div class="flex items-start justify-between mb-2">' +
+                                '<h3 class="font-bold ' + textColor + '">' + project.name + '</h3>' +
+                                '<span class="text-xs ' + textColor + ' opacity-70">' + progressCount + '条</span>' +
+                            '</div>' +
+                            '<p class="text-xs text-gray-500 mb-2">创建于 ' + formatDate(project.createdAt) + '</p>' +
+                            '<p class="text-sm text-gray-600 truncate">' + latestHtml + '</p>' +
+                        '</div>';
+
+                    if (selectMode) {
+                        card.onclick = function() { toggleSelectProject(project.id); };
+                    } else {
+                        card.onclick = function() { openProjectDetail(project.id); };
+                    }
+                    
+                    bindLongPress(card, 'project', project.id);
+                    listEl.appendChild(card);
+                });
+            });
+        });
+    }
+
+    function addProject() {
+        const input = document.getElementById('project-input');
+        const name = input.value.trim();
+        if (!name) {
+            showToast('请输入项目名称');
+            return;
+        }
+
+        db.projects.add({
+            name: name,
+            status: 'in_progress',
+            createdAt: Date.now()
+        }).then(function() {
+            input.value = '';
+            return loadProjects();
+        }).then(function() {
+            showToast('项目已创建');
+        }).catch(function(err) {
+            showToast('创建失败: ' + err.message);
+        });
+    }
+
+    function editProject(id) {
+        db.projects.get(id).then(function(project) {
+            showEdit('修改项目名称', project.name, function(newName) {
+                db.projects.update(id, { name: newName }).then(function() {
+                    loadProjects();
+                    showToast('已修改');
+                });
+            });
+        });
+    }
+
+    function deleteProject(id) {
+        showConfirm('删除项目', '确定要删除这个项目吗？所有进度记录都会被删除。', function() {
+            db.progressRecords.where('projectId').equals(id).delete().then(function() {
+                return db.projects.delete(id);
+            }).then(function() {
+                return loadProjects();
+            }).then(function() {
+                showToast('已删除');
+            });
+        });
+    }
+
+    // ========== 选择模式 ==========
+    function toggleSelectProject(id) {
+        if (selectedProjects.has(id)) {
+            selectedProjects.delete(id);
+        } else {
+            selectedProjects.add(id);
+        }
+        updateSelectModeUI();
+        loadProjects();
+    }
+
+    function updateSelectModeUI() {
+        document.getElementById('selected-count').textContent = '已选 ' + selectedProjects.size + ' 项';
+    }
+
+    function enterSelectMode() {
+        selectMode = true;
+        selectedProjects.clear();
+        document.getElementById('normal-mode').classList.add('hidden');
+        document.getElementById('select-mode').classList.remove('hidden');
+        document.getElementById('export-bottom-bar').classList.remove('hidden');
+        loadProjects();
+    }
+
+    function exitSelectMode() {
+        selectMode = false;
+        selectedProjects.clear();
+        document.getElementById('normal-mode').classList.remove('hidden');
+        document.getElementById('select-mode').classList.add('hidden');
+        document.getElementById('export-bottom-bar').classList.add('hidden');
+        loadProjects();
+    }
+
+    function toggleSelectAll() {
+        db.projects.toArray().then(function(projects) {
+            if (selectedProjects.size === projects.length) {
+                selectedProjects.clear();
+            } else {
+                projects.forEach(function(p) { selectedProjects.add(p.id); });
+            }
+            updateSelectModeUI();
+            loadProjects();
+        });
+    }
+
+    // ========== 导出Excel ==========
+    function exportSelected() {
+        if (selectedProjects.size === 0) {
+            showToast('请先选择项目');
+            return;
+        }
+
+        const rows = [];
+        const ids = Array.from(selectedProjects);
+        
+        const promises = ids.map(function(id) {
+            return Promise.all([
+                db.projects.get(id),
+                db.progressRecords.where('projectId').equals(id).sortBy('createdAt')
+            ]);
+        });
+
+        Promise.all(promises).then(function(results) {
+            results.forEach(function(result) {
+                const project = result[0];
+                const progresses = result[1];
+                const statusText = project.status === 'completed' ? '已完结' : '进行中';
+
+                if (progresses.length === 0) {
+                    rows.push({
+                        '项目名称': project.name,
+                        '项目状态': statusText,
+                        '创建日期': formatDate(project.createdAt),
+                        '进度序号': '',
+                        '记录时间': '',
+                        '进度内容': ''
+                    });
+                } else {
+                    progresses.forEach(function(p, idx) {
+                        rows.push({
+                            '项目名称': project.name,
+                            '项目状态': statusText,
+                            '创建日期': formatDate(project.createdAt),
+                            '进度序号': idx + 1,
+                            '记录时间': formatDateTime(p.createdAt),
+                            '进度内容': p.content
+                        });
+                    });
+                }
+            });
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [
+                { wch: 22 }, { wch: 10 }, { wch: 12 },
+                { wch: 8 }, { wch: 16 }, { wch: 44 }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '项目总表');
+
+            const today = new Date();
+            const filename = '项目总表_' + today.getFullYear() + '年' + 
+                String(today.getMonth()+1).padStart(2,'0') + '月' + 
+                String(today.getDate()).padStart(2,'0') + '日.xlsx';
+            
+            XLSX.writeFile(wb, filename);
+
+            // 删除已完结项目
+            const deletePromises = ids.map(function(id) {
+                return db.projects.get(id).then(function(p) {
+                    if (p.status === 'completed') {
+                        return db.progressRecords.where('projectId').equals(id).delete().then(function() {
+                            return db.projects.delete(id);
+                        });
+                    }
+                });
+            });
+
+            return Promise.all(deletePromises);
+        }).then(function() {
+            exitSelectMode();
+            showToast('导出成功，已清理已完结项目');
+        }).catch(function(err) {
+            showToast('导出失败: ' + err.message);
+        });
+    }
+
+    // ========== 项目详情 ==========
+    function openProjectDetail(projectId) {
+        currentProjectId = projectId;
+        
+        db.projects.get(projectId).then(function(project) {
+            document.getElementById('detail-project-name').textContent = project.name;
+            document.getElementById('detail-project-date').textContent = '创建于 ' + formatDate(project.createdAt);
+
+            const header = document.getElementById('detail-header');
+            if (project.status === 'completed') {
+                header.className = 'bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-4 flex-shrink-0';
+                document.getElementById('complete-btn').textContent = '取消完结';
+                document.getElementById('add-progress-section').classList.add('hidden');
+            } else {
+                header.className = 'bg-gradient-to-r from-amber-400 to-orange-400 text-white px-4 py-4 flex-shrink-0';
+                document.getElementById('complete-btn').textContent = '完结';
+                document.getElementById('add-progress-section').classList.remove('hidden');
+            }
+
+            return loadProgressList();
+        }).then(function() {
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('detail-page').classList.remove('hidden');
+        });
+    }
+
+    function goBack() {
+        document.getElementById('detail-page').classList.add('hidden');
+        document.getElementById('home-page').classList.remove('hidden');
+        currentProjectId = null;
+        loadProjects();
+    }
+
+    function loadProgressList() {
+        return db.progressRecords
+            .where('projectId').equals(currentProjectId)
+            .reverse().sortBy('createdAt')
+            .then(function(progresses) {
+                const listEl = document.getElementById('progress-list');
+                
+                if (progresses.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="text-center text-gray-400 py-12">
+                            <p class="text-4xl mb-3">📝</p>
+                            <p class="text-sm">还没有进度记录</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const total = progresses.length;
+                listEl.innerHTML = '';
+                
+                progresses.forEach(function(p, idx) {
+                    const seqNo = total - idx;
+                    const card = document.createElement('div');
+                    card.className = 'long-press bg-white border border-gray-200 rounded-xl p-4 shadow-sm';
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-medium text-orange-500 bg-orange-50 px-2 py-0.5 rounded">#${seqNo}</span>
+                            <span class="text-xs text-gray-400">${formatDateTime(p.createdAt)}</span>
+                        </div>
+                        <p class="text-gray-700 text-sm">${p.content}</p>
+                    `;
+                    bindLongPress(card, 'progress', p.id);
+                    listEl.appendChild(card);
+                });
+            });
+    }
+
+    function addProgress() {
+        const input = document.getElementById('progress-input');
+        const content = input.value.trim();
+        if (!content) {
+            showToast('请输入进度内容');
+            return;
+        }
+
+        db.progressRecords.add({
+            projectId: currentProjectId,
+            content: content,
+            createdAt: Date.now()
+        }).then(function() {
+            input.value = '';
+            return loadProgressList();
+        }).then(function() {
+            showToast('已记录');
+        });
+    }
+
+    function editProgress(id) {
+        db.progressRecords.get(id).then(function(record) {
+            showEdit('修改进度', record.content, function(newContent) {
+                db.progressRecords.update(id, { content: newContent }).then(function() {
+                    loadProgressList();
+                    showToast('已修改');
+                });
+            });
+        });
+    }
+
+    function deleteProgress(id) {
+        showConfirm('删除进度', '确定要删除这条进度记录吗？', function() {
+            db.progressRecords.delete(id).then(function() {
+                return loadProgressList();
+            }).then(function() {
+                showToast('已删除');
+            });
+        });
+    }
+
+    function toggleComplete() {
+        db.projects.get(currentProjectId).then(function(project) {
+            if (project.status === 'completed') {
+                db.projects.update(currentProjectId, { status: 'in_progress' }).then(function() {
+                    showToast('已取消完结');
+                    openProjectDetail(currentProjectId);
+                });
+            } else {
+                showConfirm('完结项目', '确定要完结这个项目吗？完结后将不能添加新进度。', function() {
+                    db.projects.update(currentProjectId, { status: 'completed' }).then(function() {
+                        showToast('项目已完结');
+                        openProjectDetail(currentProjectId);
+                    });
+                });
+            }
+        });
+    }
+
+    // ========== 事件绑定 ==========
+    document.getElementById('add-project-btn').onclick = addProject;
+    document.getElementById('project-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addProject();
+    });
+
+    document.getElementById('export-btn').onclick = enterSelectMode;
+    document.getElementById('cancel-select-btn').onclick = exitSelectMode;
+    document.getElementById('select-all-btn').onclick = toggleSelectAll;
+    document.getElementById('confirm-export-btn').onclick = exportSelected;
+
+    document.getElementById('back-btn').onclick = goBack;
+    document.getElementById('complete-btn').onclick = toggleComplete;
+    document.getElementById('add-progress-btn').onclick = addProgress;
+    document.getElementById('progress-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addProgress();
+    });
+
+    // ========== 初始化 ==========
+    db.open().then(function() {
+        return loadProjects();
+    }).catch(function(err) {
+        document.getElementById('project-list').innerHTML = 
+            '<div class="text-center text-red-400 py-20"><p>数据库初始化失败</p><p class="text-sm mt-2">' + err.message + '</p></div>';
+    });
+
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').catch(function() {});
+        });
+    }
+    </script>
+</body>
+</html>

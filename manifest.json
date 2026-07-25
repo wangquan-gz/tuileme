@@ -1,0 +1,19 @@
+{
+    "name": "你推了么",
+    "short_name": "你推了么",
+    "description": "项目进度记录工具",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#f59e0b",
+    "id": "com.nituileme.pwa",
+    "scope": "./",
+    "icons": [
+        {
+            "src": "app-icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
