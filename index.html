@@ -33,7 +33,10 @@
             <div class="bg-gradient-to-r from-amber-400 to-orange-400 text-white px-4 py-4 flex-shrink-0">
                 <div class="flex items-center justify-between mb-3">
                     <h1 class="text-xl font-bold">我的项目</h1>
-                    <button id="export-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">导出</button>
+                    <div class="flex gap-2">
+                        <button id="donate-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">打赏</button>
+                        <button id="export-btn" class="text-sm bg-white/20 px-3 py-1 rounded-full">导出</button>
+                    </div>
                 </div>
                 <div id="normal-mode" class="flex gap-2">
                     <input type="text" id="project-input" placeholder="输入项目名称..." 
@@ -104,6 +107,18 @@
                 <button id="confirm-cancel" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-700">取消</button>
                 <button id="confirm-ok" class="flex-1 py-2 rounded-lg bg-red-500 text-white">确定</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 打赏弹窗 -->
+    <div id="donate-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-6 mx-6 max-w-xs w-full text-center">
+            <h3 class="text-lg font-bold mb-2 text-gray-800">感谢支持 ❤️</h3>
+            <p class="text-sm text-gray-500 mb-4">你的鼓励是我更新的动力</p>
+            <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                <img src="donate-qr.png" alt="打赏二维码" class="w-full rounded-lg">
+            </div>
+            <button id="donate-close" class="w-full py-2 rounded-lg bg-gray-100 text-gray-700">关闭</button>
         </div>
     </div>
 
@@ -717,6 +732,17 @@
         if (e.key === 'Enter') addProject();
     });
 
+    document.getElementById('donate-btn').onclick = function() {
+        document.getElementById('donate-modal').classList.remove('hidden');
+    };
+    document.getElementById('donate-close').onclick = function() {
+        document.getElementById('donate-modal').classList.add('hidden');
+    };
+    document.getElementById('donate-modal').onclick = function(e) {
+        if (e.target.id === 'donate-modal') {
+            document.getElementById('donate-modal').classList.add('hidden');
+        }
+    };
     document.getElementById('export-btn').onclick = enterSelectMode;
     document.getElementById('cancel-select-btn').onclick = exitSelectMode;
     document.getElementById('select-all-btn').onclick = toggleSelectAll;
